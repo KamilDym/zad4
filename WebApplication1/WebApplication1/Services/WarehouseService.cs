@@ -61,7 +61,8 @@ public class WarehouseService : IWarehouseService
             idWarehouse: dto.IdWarehouse!.Value,
             idProduct: dto.IdProduct!.Value,
             idOrder: idOrder,
-            createdAt: DateTime.UtcNow);
+            createdAt: DateTime.Now,
+            amount: dto.Amount!.Value);
         
         if (!idProductWarehouse.HasValue)
             throw new Exception("Failed to register product in warehouse");

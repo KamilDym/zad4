@@ -4,7 +4,7 @@ namespace WebApplication1.Repositories;
 
 public interface IWarehouseRepository
 {
-    Task<int?> AddProductToWarehouseAsync(int idWarehouse, int idProduct, int idOrder, DateTime createdAt);
+    Task<int?> AddProductToWarehouseAsync(int idWarehouse, int idProduct, int idOrder, DateTime createdAt, int amount);
     Task<bool> CheckIfProductExist(int idProduct);
     Task<bool> CheckIfWarehouseExist(int idWarehouse);
     Task<bool> CheckIfOrderExist(int idProduct,int amount,DateTime reqestDate);
@@ -74,7 +74,7 @@ public class WarehouseRepository : IWarehouseRepository
         return true;
     }
 
-    public async Task<int?> AddProductToWarehouseAsync(int idWarehouse, int idProduct, int idOrder, DateTime createdAt)
+    public async Task<int?> AddProductToWarehouseAsync(int idWarehouse, int idProduct, int idOrder, DateTime createdAt, int amount)
     {
         await using var connection = new SqlConnection(_configuration["ConnectionStrings:DefaultConnection"]);
         await connection.OpenAsync();
@@ -86,18 +86,26 @@ public class WarehouseRepository : IWarehouseRepository
             await using var command = new SqlCommand(query, connection);
             command.Transaction = (SqlTransaction)transaction;
             command.Parameters.AddWithValue("@IdOrder", idOrder);
-            command.Parameters.AddWithValue("@FulfilledAt", DateTime.UtcNow);
+            command.Parameters.AddWithValue("@FulfilledAt", DateTime.Now);
             await command.ExecuteNonQueryAsync();
+            
+            command.CommandText = @"SELECT (Price * @Amount) FROM Product WHERE IdProduct = @IdProduct";
+            command.Parameters.Clear();
+            command.Parameters.AddWithValue("@IdProduct", idProduct);
+            command.Parameters.AddWithValue("@Amount", amount);
+            var price = await command.ExecuteScalarAsync();
             
             command.CommandText = @"
                       INSERT INTO Product_Warehouse (IdWarehouse, IdProduct, IdOrder, CreatedAt, Amount, Price)
                       OUTPUT Inserted.IdProductWarehouse
-                      VALUES (@IdWarehouse, @IdProduct, @IdOrder, @CreatedAt, 0, 0);";
+                      VALUES (@IdWarehouse, @IdProduct, @IdOrder, @CreatedAt, @Amount, @Price);";
             command.Parameters.Clear();
             command.Parameters.AddWithValue("@IdWarehouse", idWarehouse);
             command.Parameters.AddWithValue("@IdProduct", idProduct);
             command.Parameters.AddWithValue("@IdOrder", idOrder);
             command.Parameters.AddWithValue("@CreatedAt", createdAt);
+            command.Parameters.AddWithValue("@Amount", amount);
+            command.Parameters.AddWithValue("@Price", price);
             var idProductWarehouse = (int)await command.ExecuteScalarAsync();
 
             await transaction.CommitAsync();
